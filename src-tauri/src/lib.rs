@@ -13,6 +13,7 @@ pub fn run() {
             git::check_repo,
             git::list_authors,
             git::collect_commits,
+            git::get_commit_diffs,
             llm::generate_report,
             config::save_config,
             config::get_config

@@ -3,7 +3,8 @@ import RepoSelector from './components/RepoSelector';
 import FilterPanel from './components/FilterPanel';
 import ReportViewer from './components/ReportViewer';
 import SettingsModal from './components/SettingsModal';
-import { RepoInfo, Report, AppConfig } from './types';
+import CommitList from './components/CommitList';
+import { RepoInfo, Report, AppConfig, CommitSummary } from './types';
 import { invoke } from '@tauri-apps/api/core';
 import { Toaster, toast } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +14,7 @@ function App() {
   const { t } = useTranslation();
   const [repoInfo, setRepoInfo] = useState<RepoInfo | null>(null);
   const [report, setReport] = useState<Report | null>(null);
+  const [commits, setCommits] = useState<CommitSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -37,12 +39,12 @@ function App() {
     }
   };
 
-  const handleGenerate = async (filters: { author: string; startDate: string; endDate: string }) => {
+  const handleSearch = async (filters: { author: string; startDate: string; endDate: string }) => {
     if (!repoInfo) return;
     setLoading(true);
+    setReport(null);
     try {
-      // @ts-ignore
-      const commits = await invoke('collect_commits', {
+      const result = await invoke<CommitSummary[]>('collect_commits', {
         path: repoInfo.path,
         author: filters.author,
         startDate: filters.startDate,
@@ -50,18 +52,47 @@ function App() {
         maxCommits: 200,
       });
 
-      const commitsArray = commits as any[];
+      setCommits(result);
 
-      if (commitsArray.length === 0) {
+      if (result.length === 0) {
         toast.error(t('toast.noCommits'));
-        setLoading(false);
-        return;
+      } else {
+        toast.success(t('toast.foundCommits', { count: result.length }));
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error(t('toast.error', { message: String(e) }));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateReport = async (mode: 'simple' | 'detailed') => {
+    if (commits.length === 0) return;
+    setLoading(true);
+    try {
+      let commitsToProcess = [...commits];
+
+      if (mode === 'detailed') {
+        const hashes = commitsToProcess.slice(0, 50).map(c => c.hash);
+        toast.loading("正在获取代码变更...", { id: 'fetching-diffs' });
+
+        // @ts-ignore
+        const diffsMap = await invoke<Record<string, string>>('get_commit_diffs', {
+          path: repoInfo?.path,
+          hashes
+        });
+
+        commitsToProcess = commitsToProcess.map(c => ({
+          ...c,
+          diff: diffsMap[c.hash]
+        }));
+
+        toast.dismiss('fetching-diffs');
       }
 
-      toast.success(t('toast.foundCommits', { count: commitsArray.length }));
-
       const result = await invoke<Report>('generate_report', {
-        commits: commitsArray
+        commits: commitsToProcess
       });
 
       setReport(result);
@@ -112,9 +143,20 @@ function App() {
 
             <FilterPanel
               repoInfo={repoInfo}
-              onGenerate={handleGenerate}
+              onSearch={handleSearch}
+              onGenerate={handleGenerateReport}
               loading={loading}
+              hasCommits={commits.length > 0}
             />
+
+            {commits.length > 0 && (
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 px-1">
+                  提交记录 ({commits.length})
+                </h3>
+                <CommitList commits={commits} />
+              </div>
+            )}
           </div>
 
           {/* Main Content */}

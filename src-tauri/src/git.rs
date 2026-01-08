@@ -1,5 +1,6 @@
 use crate::models::{CommitSummary, RepoInfo};
 use chrono::{DateTime, Utc};
+use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
 
@@ -128,9 +129,35 @@ pub async fn collect_commits(
                 files_changed: vec![],
                 insertions: 0,
                 deletions: 0,
+                diff: None,
             })
         })
         .collect();
 
     Ok(commits)
+}
+
+#[tauri::command]
+pub async fn get_commit_diffs(
+    path: String,
+    hashes: Vec<String>,
+) -> Result<HashMap<String, String>, String> {
+    let mut diffs = HashMap::new();
+
+    for hash in hashes {
+        // Use git show to get the diff for each commit
+        // --no-color to avoid ANSI codes
+        // -U0 to minimize context lines (saves tokens)
+        // --format="" to only show the diff, not the commit info
+        let output = Command::new("git")
+            .current_dir(&path)
+            .args(["show", "--no-color", "-U0", "--format=", &hash])
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        let diff_content = String::from_utf8_lossy(&output.stdout).to_string();
+        diffs.insert(hash, diff_content);
+    }
+
+    Ok(diffs)
 }

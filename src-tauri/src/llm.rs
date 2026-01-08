@@ -57,10 +57,18 @@ Structure:
             .iter()
             .take(50) // Limit prompt size for safety
             .map(|c| format!(
-                "- {} ({}): {}",
+                "- {} ({}): {}{}",
                 c.date.format("%Y-%m-%d"),
                 c.author,
-                c.message
+                c.message,
+                if let Some(diff) = &c.diff {
+                    format!(
+                        "\n  Diff:\n```\n{}\n```",
+                        diff.chars().take(2000).collect::<String>()
+                    )
+                } else {
+                    "".to_string()
+                }
             ))
             .collect::<Vec<_>>()
             .join("\n")

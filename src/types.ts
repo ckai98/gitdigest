@@ -6,6 +6,7 @@ export interface CommitSummary {
     files_changed: string[];
     insertions: number;
     deletions: number;
+    diff?: string;
 }
 
 export interface RepoInfo {
