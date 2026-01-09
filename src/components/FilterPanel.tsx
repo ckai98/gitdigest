@@ -1,10 +1,9 @@
 import { RepoInfo } from '../types';
 import { useState, useEffect } from 'react';
-import clsx from 'clsx';
 import { subDays, format } from 'date-fns';
-// @ts-ignore
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
+import CollapsiblePanel from './ui/CollapsiblePanel';
 
 interface Props {
     repoInfo: RepoInfo | null;
@@ -31,9 +30,7 @@ export default function FilterPanel({ repoInfo, onSearch, onGenerate, loading, h
 
     const checkConfig = async () => {
         try {
-            // @ts-ignore
-            const config = await invoke('get_config');
-            // @ts-ignore
+            const config = await invoke<{ api_key?: string }>('get_config');
             setIsConfigured(!!config.api_key && config.api_key.length > 0);
         } catch {
             setIsConfigured(false);
@@ -49,31 +46,26 @@ export default function FilterPanel({ repoInfo, onSearch, onGenerate, loading, h
     };
 
     return (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                    <span>🔍</span> {t('filter.title')}
-                </h2>
-                <div className="flex items-center gap-2">
-                    <span className={clsx("w-2 h-2 rounded-full", isConfigured ? "bg-green-500" : "bg-red-500")} />
-                    <span className="text-xs text-slate-500">{isConfigured ? t('filter.llmReady') : t('filter.noKey')}</span>
-                    <button
-                        onClick={() => window.dispatchEvent(new CustomEvent('open-settings'))}
-                        className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600 transition-colors"
-                    >
-                        {t('filter.config')}
-                    </button>
-                </div>
-            </div>
-
+        <CollapsiblePanel
+            title={t('filter.title')}
+            icon={
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            }
+            defaultExpanded={true}
+        >
             <div className="space-y-4">
+                {/* Author Select */}
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">{t('filter.author')}</label>
+                    <label className="block text-xs font-medium text-content-secondary mb-1.5">
+                        {t('filter.author')}
+                    </label>
                     <select
                         value={author}
                         onChange={(e) => setAuthor(e.target.value)}
                         disabled={!repoInfo}
-                        className="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border disabled:opacity-50"
+                        className="select-field disabled:opacity-50"
                     >
                         <option value="All Authors">{t('filter.allAuthors')}</option>
                         {repoInfo?.authors.map((a) => (
@@ -82,83 +74,142 @@ export default function FilterPanel({ repoInfo, onSearch, onGenerate, loading, h
                     </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {/* Date Range */}
+                <div className="grid grid-cols-2 gap-3">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">{t('filter.startDate')}</label>
+                        <label className="block text-xs font-medium text-content-secondary mb-1.5">
+                            {t('filter.startDate')}
+                        </label>
                         <input
                             type="date"
                             value={startDate}
                             onChange={(e) => setStartDate(e.target.value)}
-                            className="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border"
+                            className="input-field"
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">{t('filter.endDate')}</label>
+                        <label className="block text-xs font-medium text-content-secondary mb-1.5">
+                            {t('filter.endDate')}
+                        </label>
                         <input
                             type="date"
                             value={endDate}
                             onChange={(e) => setEndDate(e.target.value)}
-                            className="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border"
+                            className="input-field"
                         />
                     </div>
                 </div>
 
+                {/* Search Button */}
                 <button
                     onClick={handleSearch}
                     disabled={!repoInfo || loading}
-                    className={clsx(
-                        "w-full py-2.5 px-4 rounded-lg text-slate-700 font-medium border border-slate-200 hover:bg-slate-50 transition-colors mb-3",
-                        !repoInfo ? "opacity-50 cursor-not-allowed" : ""
-                    )}
+                    className="btn-secondary w-full text-sm py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    🔍 {t('filter.search', '搜索提交记录')}
+                    {loading ? (
+                        <span className="flex items-center justify-center gap-2">
+                            <span className="w-4 h-4 border-2 border-content-tertiary/30 border-t-content-tertiary rounded-full animate-spin" />
+                            搜索中...
+                        </span>
+                    ) : (
+                        <span className="flex items-center justify-center gap-2">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            {t('filter.search', '搜索提交记录')}
+                        </span>
+                    )}
                 </button>
 
-                <div className="border-t border-slate-100 my-4 pt-4">
-                    <label className="block text-sm font-medium text-slate-700 mb-2">报告模式</label>
-                    <div className="flex bg-slate-100 p-1 rounded-lg mb-4">
+                {/* Divider */}
+                <div className="border-t border-border my-2" />
+
+                {/* Report Mode */}
+                <div>
+                    <label className="block text-xs font-medium text-content-secondary mb-2">
+                        报告模式
+                    </label>
+                    <div className="flex bg-surface-tertiary p-1 rounded-lg">
                         <button
                             onClick={() => setMode('simple')}
-                            className={clsx(
-                                "flex-1 py-1 px-3 rounded-md text-sm font-medium transition-all",
-                                mode === 'simple' ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                            )}
+                            className={`
+                                flex-1 py-1.5 px-3 rounded-md text-xs font-medium transition-all duration-200
+                                ${mode === 'simple'
+                                    ? 'bg-surface-secondary text-content-primary shadow-sm'
+                                    : 'text-content-tertiary hover:text-content-secondary'
+                                }
+                            `}
                         >
-                            📝 简单摘要
+                            <span className="flex items-center justify-center gap-1.5">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                简单摘要
+                            </span>
                         </button>
                         <button
                             onClick={() => setMode('detailed')}
-                            className={clsx(
-                                "flex-1 py-1 px-3 rounded-md text-sm font-medium transition-all",
-                                mode === 'detailed' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                            )}
+                            className={`
+                                flex-1 py-1.5 px-3 rounded-md text-xs font-medium transition-all duration-200
+                                ${mode === 'detailed'
+                                    ? 'bg-surface-secondary text-accent shadow-sm'
+                                    : 'text-content-tertiary hover:text-content-secondary'
+                                }
+                            `}
                         >
-                            🔬 深度代码
+                            <span className="flex items-center justify-center gap-1.5">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                </svg>
+                                深度代码
+                            </span>
                         </button>
                     </div>
-
-                    <button
-                        onClick={() => onGenerate(mode)}
-                        disabled={!hasCommits || loading || !isConfigured}
-                        className={clsx(
-                            "w-full py-3 px-4 rounded-lg text-white font-medium transition-all transform active:scale-95 shadow-lg",
-                            !hasCommits || !isConfigured
-                                ? "bg-slate-300 cursor-not-allowed shadow-none"
-                                : loading
-                                    ? "bg-blue-400 cursor-wait"
-                                    : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-500/30"
-                        )}
-                    >
-                        {loading
-                            ? t('filter.generating')
-                            : !hasCommits
-                                ? "请先搜索提交"
-                                : isConfigured
-                                    ? (mode === 'simple' ? "生成周报" : "生成深度报告")
-                                    : t('filter.configureFirst')}
-                    </button>
                 </div>
+
+                {/* Generate Button */}
+                <button
+                    onClick={() => onGenerate(mode)}
+                    disabled={!hasCommits || loading || !isConfigured}
+                    className={`
+                        w-full py-3 px-4 rounded-lg font-medium text-sm transition-all duration-200
+                        ${!hasCommits || !isConfigured
+                            ? 'bg-surface-tertiary text-content-tertiary cursor-not-allowed'
+                            : loading
+                                ? 'btn-primary opacity-75 cursor-wait'
+                                : 'btn-primary'
+                        }
+                    `}
+                >
+                    {loading ? (
+                        <span className="flex items-center justify-center gap-2">
+                            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            {t('filter.generating')}
+                        </span>
+                    ) : !hasCommits ? (
+                        <span className="flex items-center justify-center gap-2">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            请先搜索提交
+                        </span>
+                    ) : !isConfigured ? (
+                        <span className="flex items-center justify-center gap-2">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            {t('filter.configureFirst')}
+                        </span>
+                    ) : (
+                        <span className="flex items-center justify-center gap-2">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                            </svg>
+                            {mode === 'simple' ? '生成周报' : '生成深度报告'}
+                        </span>
+                    )}
+                </button>
             </div>
-        </div>
+        </CollapsiblePanel>
     );
 }
